@@ -11,7 +11,7 @@ import Modal from 'react-native-modal';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
-import { createTask } from '../services/taskService';
+import { createTask, updateTask } from '../services/taskService';
 import Toast from 'react-native-toast-message';
 import FormInput from './FormInput';
 
@@ -29,6 +29,8 @@ interface AddTaskModalProps {
   isVisible: boolean;
   onClose: () => void;
   onAddTask: (task: Omit<Task, 'id' | 'completed'>) => void;
+  task?: Task;
+  onUpdateTask?: () => void;
 }
 
 interface TaskFormData {
@@ -64,8 +66,11 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   isVisible,
   onClose,
   onAddTask,
+  task,
+  onUpdateTask,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEditMode = !!task;
   const {
     control,
     handleSubmit,
@@ -84,11 +89,18 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
   });
 
   useEffect(() => {
-    if (!isVisible) {
+    if (isVisible && task) {
+      reset({
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        category: task.category,
+      });
+    } else if (!isVisible) {
       reset();
       setIsSubmitting(false);
     }
-  }, [isVisible, reset]);
+  }, [isVisible, task, reset]);
 
   const onSubmit = async (data: TaskFormData) => {
     try {
@@ -97,29 +109,53 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
       const taskData = {
         title: data.title.trim(),
         description: data.description.trim(),
-        dueDate: '',
+        dueDate: task?.dueDate || '',
         priority: data.priority,
         category: data.category.trim(),
       };
 
-      const result = await createTask(taskData);
+      if (isEditMode && task) {
+        const result = await updateTask(task.id, taskData);
 
-      if (result.success) {
-        Toast.show({
-          type: 'success',
-          text1: 'Success!',
-          text2: 'Task created successfully',
-        });
+        if (result.success) {
+          Toast.show({
+            type: 'success',
+            text1: 'Success!',
+            text2: 'Task updated successfully',
+          });
 
-        onAddTask(taskData);
-        reset();
-        onClose();
+          if (onUpdateTask) {
+            onUpdateTask();
+          }
+          reset();
+          onClose();
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Error!',
+            text2: result.error || 'Failed to update task',
+          });
+        }
       } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Error!',
-          text2: result.error || 'Failed to create task',
-        });
+        const result = await createTask(taskData);
+
+        if (result.success) {
+          Toast.show({
+            type: 'success',
+            text1: 'Success!',
+            text2: 'Task created successfully',
+          });
+
+          onAddTask(taskData);
+          reset();
+          onClose();
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Error!',
+            text2: result.error || 'Failed to create task',
+          });
+        }
       }
     } catch (error) {
       Toast.show({
@@ -146,7 +182,9 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
       <View style={styles.modalContent}>
         <View style={styles.handle} />
         <ScrollView showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Add New Task</Text>
+          <Text style={styles.title}>
+            {isEditMode ? 'Edit Task' : 'Add New Task'}
+          </Text>
 
           <View style={styles.form}>
             <FormInput
@@ -248,7 +286,9 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({
               {isSubmitting ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.addButtonText}>Add Task</Text>
+                <Text style={styles.addButtonText}>
+                  {isEditMode ? 'Update Task' : 'Add Task'}
+                </Text>
               )}
             </TouchableOpacity>
           </View>

@@ -18,6 +18,8 @@ import {
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DeleteIcon from '../../components/icons/DeleteIcon';
+import EditIcon from '../../components/icons/EditIcon';
+import AddTaskModal from '../../components/AddTaskModal';
 
 type TaskDetailScreenRouteProp = RouteProp<AppStackParamList, 'TaskDetail'>;
 
@@ -80,52 +82,64 @@ const TaskDetailScreen = () => {
     route.params || {};
   const [task, setTask] = useState<Task | null>(routeTask || null);
   const [loading, setLoading] = useState(!routeTask);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
-  const loadTask = useCallback(async () => {
-    if (routeTask) {
-      setTask(routeTask);
-      setLoading(false);
-      return;
-    }
+  const loadTask = useCallback(
+    async (forceRefresh = false) => {
+      const taskId = (route.params as any)?.taskId || routeTask?.id;
 
-    const taskId = (route.params as any)?.taskId;
-    if (!taskId) {
-      setLoading(false);
-      return;
-    }
+      if (!taskId) {
+        if (routeTask) {
+          setTask(routeTask);
+          setLoading(false);
+          return;
+        }
+        setLoading(false);
+        return;
+      }
 
-    try {
-      setLoading(true);
-      const result = await getTask(taskId);
-      if (result.success && result.task) {
-        const taskData = result.task as any;
-        setTask({
-          id: taskData.id,
-          title: taskData.title || '',
-          description: taskData.description || '',
-          dueDate: taskData.dueDate || '',
-          priority: taskData.priority || 'medium',
-          category: taskData.category || '',
-          completed: taskData.completed || false,
-        });
-      } else {
+      if (!forceRefresh && routeTask) {
+        setTask(routeTask);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const result = await getTask(taskId);
+        if (result.success && result.task) {
+          const taskData = result.task as any;
+          setTask({
+            id: taskData.id,
+            title: taskData.title || '',
+            description: taskData.description || '',
+            dueDate: taskData.dueDate || '',
+            priority: taskData.priority || 'medium',
+            category: taskData.category || '',
+            completed: taskData.completed || false,
+          });
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Error!',
+            text2: result.error || 'Task not found',
+          });
+        }
+      } catch (error) {
         Toast.show({
           type: 'error',
           text1: 'Error!',
-          text2: result.error || 'Task not found',
+          text2:
+            error instanceof Error
+              ? error.message
+              : 'An unknown error occurred',
         });
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error!',
-        text2:
-          error instanceof Error ? error.message : 'An unknown error occurred',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [routeTask, route.params]);
+    },
+    [routeTask, route.params],
+  );
 
   useEffect(() => {
     loadTask();
@@ -216,16 +230,12 @@ const TaskDetailScreen = () => {
   };
 
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return '#ff5252';
-      case 'medium':
-        return '#ff9800';
-      case 'low':
-        return '#4caf50';
-      default:
-        return '#999';
-    }
+    const priorityColors: { [key: string]: string } = {
+      high: '#ff5252',
+      medium: '#ff9800',
+      low: '#4caf50',
+    };
+    return priorityColors[priority] || '#999';
   };
 
   if (loading) {
@@ -316,6 +326,14 @@ const TaskDetailScreen = () => {
 
         <View style={styles.actionSection}>
           <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => setIsEditModalVisible(true)}
+          >
+            <EditIcon color="#fff" size={20} />
+            <Text style={styles.editButtonText}>Edit Task</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[
               styles.completeButton,
               task.completed
@@ -343,6 +361,14 @@ const TaskDetailScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      <AddTaskModal
+        isVisible={isEditModalVisible}
+        onClose={() => setIsEditModalVisible(false)}
+        onAddTask={() => {}}
+        task={task}
+        onUpdateTask={() => loadTask(true)}
+      />
     </ScrollView>
   );
 };
@@ -453,6 +479,21 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     borderTopWidth: 1,
     borderTopColor: '#eee',
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#6200ee',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    gap: 8,
+  },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   completeButton: {
     borderRadius: 8,

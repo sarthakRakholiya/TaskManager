@@ -40,7 +40,7 @@ interface Task {
   category: string;
   completed: boolean;
 }
-
+//Task Skeleton Item
 const TaskSkeletonItem = () => {
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
@@ -86,6 +86,7 @@ const TaskSkeletonItem = () => {
   );
 };
 
+//Home Screen
 const HomeScreen = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
